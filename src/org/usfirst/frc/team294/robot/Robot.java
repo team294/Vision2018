@@ -16,11 +16,9 @@ import edu.wpi.first.wpilibj.command.Command;
 import edu.wpi.first.wpilibj.command.Scheduler;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.vision.VisionRunner;
 import edu.wpi.first.wpilibj.vision.VisionThread;
 
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
 import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 import org.usfirst.frc.team294.robot.commands.ExampleCommand;
@@ -39,8 +37,7 @@ public class Robot extends TimedRobot {
 			= new ExampleSubsystem();
 	public static OI m_oi;
 	public static VisionThread visionThread;
-	public static VisionRunner visionRunner;
-	public static Object imgLock;
+	public static Object imgLock = new Object();
 	public static double centerX;
 
 	Command m_autonomousCommand;
@@ -59,7 +56,7 @@ public class Robot extends TimedRobot {
 		
 		UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
 	    camera.setResolution(GripPipeline.IMG_WIDTH, GripPipeline.IMG_HEIGHT);
-	    System.out.println("This is the set fps " + camera.setFPS(15));
+	    camera.setFPS(15);
 	    
 	    CvSink m_cvSink = new CvSink("Test CvSink");
 	    m_cvSink.setSource(camera);
@@ -77,36 +74,14 @@ public class Robot extends TimedRobot {
 	 
 	    
 	    visionThread = new VisionThread(camera, new GripPipeline(), pipeline -> {
-	    	System.out.println("Contour count: " + pipeline.filterContoursOutput().size() + ", empty = " + pipeline.filterContoursOutput().isEmpty());
-	        if (!pipeline.filterContoursOutput().isEmpty()) {
-//	    	    MatOfPoint m;
-//	        	m = pipeline.filterContoursOutput().get(0);
-//	        	Rect r = Imgproc.boundingRect(m);
-////	        	synchronized (imgLock) {
-//	        		centerX = r.x;
-////	        	}
-	        	
+	    	if (!pipeline.filterContoursOutput().isEmpty()) {
 	            Rect r = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
-	            synchronized (visionThread) {
+	            synchronized (imgLock) {
 	                centerX = r.x + (r.width / 2);
 	            }
 	        }
 	    });
 	    visionThread.start();
-
-//	    visionRunner = new VisionRunner<>(camera, new GripPipeline(), pipeline -> {
-//	        if (!pipeline.filterContoursOutput().isEmpty()) {
-//	            Rect r = Imgproc.boundingRect(pipeline.filterContoursOutput().get(0));
-//	            synchronized (imgLock) {
-//	                centerX = r.x + (r.width / 2);
-//	            }
-//	        }
-//	    });
-//	    visionRunner.runOnce();
-	    
-//	    visionThread = new VisionThread(visionRunner);
-//	    visionThread.start();
-
 	    
 	}
 
@@ -179,7 +154,7 @@ public class Robot extends TimedRobot {
 	public void teleopPeriodic() {
 		Scheduler.getInstance().run();
 		double centerX;
-	    synchronized (visionThread) {
+	    synchronized (imgLock) {
 	        centerX = this.centerX;
 	    }
 	    SmartDashboard.putNumber("xcoord", centerX);
